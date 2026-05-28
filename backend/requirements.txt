@@ -1,5 +1,5 @@
 fastapi>=0.110
 uvicorn[standard]>=0.27
-tensorflow>=2.16
+ai-edge-litert>=2.1.5
 numpy>=1.26
 pydantic>=2.6
