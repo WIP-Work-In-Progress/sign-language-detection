@@ -47,4 +47,31 @@ The model is set to train for a hundred epochs with an early stop set up to halt
 Once the model was up and running, this was basically a home run. The application uses OpenCV to capture frames from a video device, detects a hand using MediaPipe and feeds the landmarks to a loaded model. Next it displays the landmarks with connections and the model's prediction. RTP achieved!
 
 ## Usage
-To use the application, install requirements from requirements.txt file, run the real-time-prediction.py and start signing! You can quit the application by pressing "q".
+
+### Option A — Original desktop prototype (OpenCV window)
+Install requirements from `requirements.txt`, run `real-time-prediciton.py` and start signing. Quit with `q`.
+
+### Option B — Web application (recommended)
+The web app reuses the exact same trained model (`model/asl_classifierv4.h5`) but exposes it through a browser UI: webcam preview, live letter prediction, and a sentence builder where each sign is committed after being held steady for ~1.5 s. MediaPipe runs in the browser, so only the 42-feature vector travels to the backend per prediction.
+
+Architecture: **FastAPI** (Python) + **React + Vite + TypeScript** (browser).
+
+**Backend** (Python ≥ 3.10):
+```
+pip install -r backend/requirements.txt
+python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
+```
+Endpoints: `GET /health`, `GET /labels`, `POST /predict`.
+
+**Frontend** (Node ≥ 18):
+```
+cd frontend
+npm install
+npm run dev
+```
+Open <http://127.0.0.1:5173>, allow camera access, and start signing.
+
+Controls inside the web app:
+- Hold a sign for ~1.5 s → letter is appended to the sentence.
+- `Space`, `Backspace`, `Clear`, `Copy` buttons.
+- Keyboard shortcuts: `Space` / `Backspace` / `Esc` / `Ctrl+C`.
