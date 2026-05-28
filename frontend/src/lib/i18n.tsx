@@ -78,6 +78,13 @@ const en: Dict = {
   "maze.lost": "The chaser caught you. Press Restart and try again.",
   "maze.bestTimes": "Best times",
   "maze.noScores": "No scores yet — finish a run.",
+  "settings.holdTime": "Hold time",
+  "settings.holdTime.hint":
+    "How long you need to hold a sign before it commits. Lower = faster but more accidental commits.",
+  "settings.slow": "Slow",
+  "settings.fast": "Fast",
+  "settings.seconds": "{seconds}s",
+  "settings.reset": "Reset",
 };
 
 const pl: Dict = {
@@ -149,6 +156,13 @@ const pl: Dict = {
     "Goniący Cię złapał. Naciśnij Zacznij od nowa i spróbuj jeszcze raz.",
   "maze.bestTimes": "Najlepsze czasy",
   "maze.noScores": "Brak wyników — skończ pierwszą rozgrywkę.",
+  "settings.holdTime": "Czas przytrzymania",
+  "settings.holdTime.hint":
+    "Jak długo trzymać znak, żeby się zatwierdził. Mniej = szybciej, ale więcej przypadkowych zatwierdzeń.",
+  "settings.slow": "Wolno",
+  "settings.fast": "Szybko",
+  "settings.seconds": "{seconds}s",
+  "settings.reset": "Domyślne",
 };
 
 const dicts: Record<Lang, Dict> = { en, pl };

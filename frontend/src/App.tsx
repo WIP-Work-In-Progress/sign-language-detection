@@ -16,16 +16,36 @@ import { normalizeLandmarks } from "./lib/normalize";
 
 type Mode = "sentence" | "maze";
 
-// Frame-window commit: K matches required out of last N frames. At ~10 Hz
-// prediction rate, sentence 5-of-7 ≈ 500 ms minimum, deliberate enough that
-// hand transitions between intentional signs don't sneak through. Maze
-// stays snappy at 2-of-4 so movement feels responsive.
-const SENTENCE_WINDOW = 16;
-const SENTENCE_REQUIRED = 14;
-const MAZE_WINDOW = 4;
-const MAZE_REQUIRED = 2;
+// Frame-window commit: K matches required out of last N frames at ~10 Hz
+// prediction rate. The slider lets users tune the K value (in seconds);
+// N is derived to give a small slack for sentence mode and a 2× tolerance
+// for maze mode where transitions between U/D/L/R need extra room.
+const PREDICTION_HZ = 10;
+const SENTENCE_DEFAULT_MS = 1400;
+const SENTENCE_MIN_MS = 500;
+const SENTENCE_MAX_MS = 3000;
+const MAZE_DEFAULT_MS = 200;
+const MAZE_MIN_MS = 100;
+const MAZE_MAX_MS = 2000;
+const HOLD_STEP_MS = 100;
 const MIN_CONFIDENCE = 0.4;
 const EMA_ALPHA = 0.6;
+
+const SENTENCE_HOLD_KEY = "asl-sentence-hold-ms";
+const MAZE_HOLD_KEY = "asl-maze-hold-ms";
+
+function loadHoldMs(key: string, fallback: number, min: number, max: number): number {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return fallback;
+    const n = parseInt(raw, 10);
+    if (!Number.isFinite(n)) return fallback;
+    return Math.min(max, Math.max(min, n));
+  } catch {
+    return fallback;
+  }
+}
 
 // In maze mode the sign-as-pointer mapping (hand pointing in a direction
 // triggers the matching ASL letter): B = up, Q = down, H = left, G = right.
@@ -57,6 +77,34 @@ export default function App() {
   );
   const [mode, setMode] = useState<Mode>("sentence");
   const [mazeCommand, setMazeCommand] = useState<MazeCommand | null>(null);
+  const [sentenceHoldMs, setSentenceHoldMs] = useState<number>(() =>
+    loadHoldMs(SENTENCE_HOLD_KEY, SENTENCE_DEFAULT_MS, SENTENCE_MIN_MS, SENTENCE_MAX_MS),
+  );
+  const [mazeHoldMs, setMazeHoldMs] = useState<number>(() =>
+    loadHoldMs(MAZE_HOLD_KEY, MAZE_DEFAULT_MS, MAZE_MIN_MS, MAZE_MAX_MS),
+  );
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(SENTENCE_HOLD_KEY, String(sentenceHoldMs));
+    } catch {
+      /* ignore quota errors */
+    }
+  }, [sentenceHoldMs]);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(MAZE_HOLD_KEY, String(mazeHoldMs));
+    } catch {
+      /* ignore quota errors */
+    }
+  }, [mazeHoldMs]);
+
+  // K frames required at ~10 Hz; N = K + slack so the user has a couple
+  // of forgiving frames where the prediction can flicker without resetting.
+  const sentenceRequired = Math.max(1, Math.round(sentenceHoldMs / (1000 / PREDICTION_HZ)));
+  const sentenceWindow = sentenceRequired + 2;
+  const mazeRequired = Math.max(1, Math.round(mazeHoldMs / (1000 / PREDICTION_HZ)));
+  const mazeWindow = Math.max(mazeRequired + 2, mazeRequired * 2);
 
   const prediction = usePrediction({ minIntervalMs: 100 });
   const smoothed = useSmoothedPrediction(prediction.response, { alpha: EMA_ALPHA });
@@ -81,8 +129,8 @@ export default function App() {
   );
 
   const hold = useHoldToCommit(handleCommit, {
-    windowSize: mode === "maze" ? MAZE_WINDOW : SENTENCE_WINDOW,
-    requiredMatches: mode === "maze" ? MAZE_REQUIRED : SENTENCE_REQUIRED,
+    windowSize: mode === "maze" ? mazeWindow : sentenceWindow,
+    requiredMatches: mode === "maze" ? mazeRequired : sentenceRequired,
     minConfidence: MIN_CONFIDENCE,
     allowRepeat: mode === "maze",
     ignoreLabels: mode === "maze" ? MAZE_IGNORE_LABELS : ["Blank"],
@@ -211,9 +259,15 @@ export default function App() {
   // Approximate per-commit seconds for the subtitle. With 10 Hz prediction and
   // K-of-N window, fastest commit happens after `requiredMatches` frames.
   const approxSeconds = useMemo(() => {
-    const req = mode === "maze" ? MAZE_REQUIRED : SENTENCE_REQUIRED;
-    return (req * 0.1).toFixed(1);
-  }, [mode]);
+    const ms = mode === "maze" ? mazeHoldMs : sentenceHoldMs;
+    return (ms / 1000).toFixed(1);
+  }, [mode, mazeHoldMs, sentenceHoldMs]);
+
+  const currentHoldMs = mode === "maze" ? mazeHoldMs : sentenceHoldMs;
+  const holdMinMs = mode === "maze" ? MAZE_MIN_MS : SENTENCE_MIN_MS;
+  const holdMaxMs = mode === "maze" ? MAZE_MAX_MS : SENTENCE_MAX_MS;
+  const holdDefaultMs = mode === "maze" ? MAZE_DEFAULT_MS : SENTENCE_DEFAULT_MS;
+  const setCurrentHoldMs = mode === "maze" ? setMazeHoldMs : setSentenceHoldMs;
 
   return (
     <div className="app">
@@ -277,6 +331,39 @@ export default function App() {
           </div>
         </div>
       </header>
+
+      <div className="settings-strip">
+        <div className="settings-row">
+          <label className="settings-label" htmlFor="hold-slider">
+            {t("settings.holdTime")}
+            <span className="settings-value">
+              {t("settings.seconds", { seconds: (currentHoldMs / 1000).toFixed(1) })}
+            </span>
+          </label>
+          <div className="settings-slider">
+            <span className="settings-endpoint">{t("settings.fast")}</span>
+            <input
+              id="hold-slider"
+              type="range"
+              min={holdMinMs}
+              max={holdMaxMs}
+              step={HOLD_STEP_MS}
+              value={currentHoldMs}
+              onChange={(e) => setCurrentHoldMs(parseInt(e.target.value, 10))}
+            />
+            <span className="settings-endpoint">{t("settings.slow")}</span>
+            <button
+              type="button"
+              className="settings-reset"
+              onClick={() => setCurrentHoldMs(holdDefaultMs)}
+              disabled={currentHoldMs === holdDefaultMs}
+            >
+              {t("settings.reset")}
+            </button>
+          </div>
+          <p className="settings-hint">{t("settings.holdTime.hint")}</p>
+        </div>
+      </div>
 
       {backendOk === "error" && (
         <div className="error-banner">
