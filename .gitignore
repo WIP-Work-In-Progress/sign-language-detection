@@ -18,3 +18,6 @@ frontend/.vite/
 # all model except the prod one
 model/*
 !model/*prod*
+
+# docker compose (it is for vps)
+docker-compose.prod.yml

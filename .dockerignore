@@ -1,0 +1,11 @@
+.git
+.github
+.vscode
+__pycache__/
+*.pyc
+data/
+model/*.h5
+model/*.png
+frontend/node_modules/
+frontend/dist/
+*.csv
