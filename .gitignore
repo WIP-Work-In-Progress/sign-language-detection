@@ -14,3 +14,7 @@ frontend/.vite/
 # IDE
 .idea/
 .vscode/
+
+# all model except the prod one
+model/*
+!model/*prod*
