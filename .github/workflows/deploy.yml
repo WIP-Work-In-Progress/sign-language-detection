@@ -10,8 +10,8 @@ permissions:
   packages: write
 
 env:
-  IMAGE_BACKEND: ${{ toLower(github.repository_owner) }}/miganie-backend
-  IMAGE_FRONTEND: ${{ toLower(github.repository_owner) }}/miganie-frontend
+  IMAGE_NAME_BACKEND: miganie-backend
+  IMAGE_NAME_FRONTEND: miganie-frontend
 
 jobs:
   build-and-deploy:
@@ -19,6 +19,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set image owner
+        run: echo "IMAGE_OWNER=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_ENV"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -37,8 +40,8 @@ jobs:
           file: deploy/Dockerfile.backend
           push: true
           tags: |
-            ghcr.io/${{ env.IMAGE_BACKEND }}:${{ github.sha }}
-            ghcr.io/${{ env.IMAGE_BACKEND }}:latest
+            ghcr.io/${{ env.IMAGE_OWNER }}/${{ env.IMAGE_NAME_BACKEND }}:${{ github.sha }}
+            ghcr.io/${{ env.IMAGE_OWNER }}/${{ env.IMAGE_NAME_BACKEND }}:latest
 
       - name: Build and push frontend
         uses: docker/build-push-action@v6
@@ -49,5 +52,5 @@ jobs:
           build-args: |
             VITE_API_BASE=${{ secrets.VITE_API_BASE }}
           tags: |
-            ghcr.io/${{ env.IMAGE_FRONTEND }}:${{ github.sha }}
-            ghcr.io/${{ env.IMAGE_FRONTEND }}:latest
+            ghcr.io/${{ env.IMAGE_OWNER }}/${{ env.IMAGE_NAME_FRONTEND }}:${{ github.sha }}
+            ghcr.io/${{ env.IMAGE_OWNER }}/${{ env.IMAGE_NAME_FRONTEND }}:latest
