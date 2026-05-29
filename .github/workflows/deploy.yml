@@ -10,8 +10,8 @@ permissions:
   packages: write
 
 env:
-  IMAGE_BACKEND: ${{ github.repository_owner }}/miganie-backend
-  IMAGE_FRONTEND: ${{ github.repository_owner }}/miganie-frontend
+  IMAGE_BACKEND: sign-language-detection/miganie-backend
+  IMAGE_FRONTEND: sign-language-detection/miganie-frontend
 
 jobs:
   build-and-deploy:
