@@ -440,9 +440,7 @@ export default function App() {
       </div>
 
       <p className="footnote">
-        {mode === "maze"
-          ? t("app.footnote.maze")
-          : t("app.footnote.sentence", { pct: Math.round(MIN_CONFIDENCE * 100) })}
+        Made by <a className="footnote-link" href="https://wip-ug.web.app">Work In Progress Science Club</a>
       </p>
 
       {toast && <div className="toast">{toast}</div>}

@@ -13,12 +13,12 @@ export type Lang = "pl" | "en";
 type Dict = Record<string, string>;
 
 const en: Dict = {
-  "app.title.sentence": "ASL Sentence Builder",
-  "app.title.maze": "ASL Maze",
+  "app.title.sentence": "Miganie Bystre",
+  "app.title.maze": "Sign Maze",
   "app.subtitle.sentence":
     "Show signs to your camera. Hold a letter for {seconds}s to add it to the sentence.",
   "app.subtitle.maze":
-    "Sign B↑ / Q↓ / H← / G→ to navigate. {seconds}s per move.",
+    "B - top ↑ / Q - bottom ↓ / H left ← / G right → | {seconds}s per move.",
   "app.mode.sentence": "Sentence",
   "app.mode.maze": "Maze",
   "app.footnote.sentence":
@@ -34,7 +34,7 @@ const en: Dict = {
   "status.predicting": "predicting",
   "status.ready": "ready",
   "error.backend":
-    "Could not reach the backend at {host}. Start it with {cmd} and refresh.",
+    "Could not reach the backend at {host}.",
   "error.mediapipe": "MediaPipe error: {message}",
   "error.prediction": "Prediction error: {message}",
   "camera.label": "Camera",
@@ -88,18 +88,18 @@ const en: Dict = {
 };
 
 const pl: Dict = {
-  "app.title.sentence": "Układanie zdań ASL",
-  "app.title.maze": "Labirynt ASL",
+  "app.title.sentence": "Miganie Bystre",
+  "app.title.maze": "Migający Labirynt",
   "app.subtitle.sentence":
-    "Pokaż znaki kamerze. Przytrzymaj literę przez {seconds}s, aby dodać ją do zdania.",
+    "Migaj kamerze. Przytrzymaj literę przez {seconds}s, aby ją dodać do zdania poniżej",
   "app.subtitle.maze":
-    "Pokazuj B↑ / Q↓ / H← / G→ żeby się poruszać. {seconds}s na ruch.",
-  "app.mode.sentence": "Zdania",
-  "app.mode.maze": "Labirynt",
+    "B - góra↑ / Q - dół ↓ / H lewo ← / G prawo → | {seconds}s na ruch.",
+  "app.mode.sentence": "Tryb pisania",
+  "app.mode.maze": "Gra - labirynt",
   "app.footnote.sentence":
-    "Litery J i Z są w ASL dynamiczne, ale model traktuje je statycznie. Próg pewności {pct}%.",
+    "Stworzone przez Work In Progress Science Club",
   "app.footnote.maze":
-    "W trybie labiryntu liczą się tylko B/Q/H/G (orientacja ręki = kierunek strzałki). Przełącznikami włączysz obracanie i goniącego.",
+    'Stworzone przez <a class="footnote-link" href="https://wip-ug.web.app">Work In Progress Science Club</a>',
   "status.backendOffline": "backend offline",
   "status.checkingBackend": "sprawdzam backend",
   "status.loadingModel": "ładuję model",
@@ -114,48 +114,48 @@ const pl: Dict = {
   "error.prediction": "Błąd predykcji: {message}",
   "camera.label": "Kamera",
   "camera.stop": "stop",
-  "camera.askPermission": "Zezwól na dostęp do kamery, żeby zacząć",
+  "camera.askPermission": "Zezwól na dostęp do kamery, żeby korzystać",
   "camera.start": "Włącz kamerę",
   "camera.denied":
-    "Odmówiono dostępu do kamery. Zmień uprawnienia w przeglądarce i odśwież.",
+    "Brak dostępu do kamery. Zmień uprawnienia w przeglądarce i odśwież.",
   "camera.error": "Błąd kamery: {message}",
-  "panel.detection": "Detekcja",
+  "panel.detection": "Rozpoznawanie",
   "panel.direction": "Kierunek",
   "panel.topGuesses": "Najlepsze typy",
-  "panel.noHand": "Brak ręki w kadrze",
+  "panel.noHand": "Pokaż łapkę 🖐️",
   "panel.confidence": "{pct}% pewności",
   "panel.detectedNotDirection":
     "Wykryto {letter} ({pct}%) — pokaż {keys}",
   "panel.signKeys": "Pokaż {keys}",
-  "panel.holdToCommit": "Przytrzymaj znak żeby dodać do zdania",
+  "panel.holdToCommit": "Przytrzymaj rękę żeby dodać znak do zdania",
   "panel.holdToMove": "Przytrzymaj {keys} żeby się ruszyć",
   "panel.holdProgress": "Trzymaj \"{letter}\" — {pct}%",
   "panel.holdProgressArrow": "Trzymaj {letter} ({arrow}) — {pct}%",
   "panel.releaseGate":
     "Opuść rękę lub zmień znak, by ponownie dodać {what}",
-  "sentence.placeholder": "Pokaż znaki, by zacząć pisać…",
+  "sentence.placeholder": "Zamigaj, aby zobaczyć zdanie tutaj:",
   "sentence.space": "Spacja",
   "sentence.backspace": "Usuń znak",
   "sentence.clear": "Wyczyść",
   "sentence.copy": "Kopiuj",
   "sentence.added": "Dodano \"{letter}\"",
-  "sentence.copied": "Skopiowano",
-  "sentence.copiedClipboard": "Skopiowano do schowka",
-  "sentence.copyFailed": "Kopiowanie nie powiodło się",
+  "sentence.copied": "Skopiowano!",
+  "sentence.copiedClipboard": "Skopiowano do schowka!",
+  "sentence.copyFailed": "Kopiowanie nie powiodło się :(",
   "maze.time": "Czas",
   "maze.start": "Start",
-  "maze.restart": "Zacznij od nowa",
+  "maze.restart": "Restart",
   "maze.rotation": "Obrót",
-  "maze.chaser": "Goniący",
+  "maze.chaser": "Berek",
   "maze.on": "wł",
   "maze.off": "wył",
   "maze.hint":
-    "Pokazuj znaki, żeby dotrzeć do zielonego pola. Przełącz Obrót, by plansza co kilka sekund się przekręcała, albo Goniącego, by dodać czerwonego prześladowcę.",
-  "maze.won": "🏁 Dotarłeś do mety w {time}",
+    "Migaj, żeby dotrzeć do mety. Przełącz Obrót, by plansza co kilka sekund się przekręcała, albo Berka, by dodać prześladowcę 👀.",
+  "maze.won": "🏁 Meta w {time}!",
   "maze.lost":
-    "Goniący Cię złapał. Naciśnij Zacznij od nowa i spróbuj jeszcze raz.",
-  "maze.bestTimes": "Najlepsze czasy",
-  "maze.noScores": "Brak wyników — skończ pierwszą rozgrywkę.",
+    "Berek! Naciśnij Restart spróbuj jeszcze raz.",
+  "maze.bestTimes": "Najlepsze wyniki",
+  "maze.noScores": "Brak wyników — skończ pierwszą grę.",
   "settings.holdTime": "Czas przytrzymania",
   "settings.holdTime.hint":
     "Jak długo trzymać znak, żeby się zatwierdził. Mniej = szybciej, ale więcej przypadkowych zatwierdzeń.",
