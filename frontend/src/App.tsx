@@ -54,12 +54,14 @@ const MAZE_LETTER_TO_DIR: Record<string, MazeCommand["letter"]> = {
   Q: "D",
   H: "L",
   G: "R",
+  J: "R"
 };
 const MAZE_LETTER_TO_ARROW: Record<string, string> = {
   B: "↑",
   Q: "↓",
   H: "←",
   G: "→",
+  J: "→"
 };
 const MAZE_IGNORE_LABELS = [
   "Blank",
