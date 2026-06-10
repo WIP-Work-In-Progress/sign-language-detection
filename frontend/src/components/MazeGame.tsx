@@ -9,6 +9,7 @@ import {
   type Maze,
   type Pos,
 } from "../lib/maze";
+import { getLeaderboard, submitScore, type ScoreEntry } from "../lib/api";
 import { useTranslation } from "../lib/i18n";
 
 const MAZE_W = 8;
@@ -18,30 +19,9 @@ const ROTATION_MIN_MS = 5000;
 const ROTATION_MAX_MS = 8000;
 const CHASER_INTERVAL_MS = 1700;
 const CHASER_START_DELAY_MS = 4000;
-const HIGHSCORE_KEY = "maze-highscores-v1";
+const NAME_KEY = "maze-player-name";
 
 type Status = "idle" | "playing" | "won" | "lost";
-
-interface Score {
-  ms: number;
-  ts: number;
-}
-
-function loadScores(): Score[] {
-  try {
-    const raw = localStorage.getItem(HIGHSCORE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed as Score[];
-  } catch {
-    return [];
-  }
-}
-
-function saveScores(scores: Score[]) {
-  localStorage.setItem(HIGHSCORE_KEY, JSON.stringify(scores));
-}
 
 function formatTime(ms: number): string {
   return `${(ms / 1000).toFixed(2)}s`;
@@ -69,10 +49,19 @@ export function MazeGame({ command }: MazeGameProps) {
   const [status, setStatus] = useState<Status>("idle");
   const startedAtRef = useRef<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
-  const [scores, setScores] = useState<Score[]>(() => loadScores());
+  const [scores, setScores] = useState<ScoreEntry[]>([]);
   const lastCommandTs = useRef<number | null>(null);
   const [rotationEnabled, setRotationEnabled] = useState(false);
   const [chaserEnabled, setChaserEnabled] = useState(false);
+  const runModesRef = useRef({ rotation: false, chaser: false });
+  const [name, setName] = useState(() => localStorage.getItem(NAME_KEY) ?? "");
+  const [submitted, setSubmitted] = useState(false);
+
+  useEffect(() => {
+    getLeaderboard()
+      .then(setScores)
+      .catch(() => {});
+  }, []);
 
   const start = useCallback(() => {
     setMaze(generateMaze({ width: MAZE_W, height: MAZE_H }));
@@ -82,8 +71,10 @@ export function MazeGame({ command }: MazeGameProps) {
     setElapsed(0);
     startedAtRef.current = performance.now();
     lastCommandTs.current = null;
+    runModesRef.current = { rotation: rotationEnabled, chaser: chaserEnabled };
+    setSubmitted(false);
     setStatus("playing");
-  }, []);
+  }, [rotationEnabled, chaserEnabled]);
 
   // Apply incoming U/D/L/R commands (screen-frame → maze-frame via rotation).
   useEffect(() => {
@@ -102,14 +93,22 @@ export function MazeGame({ command }: MazeGameProps) {
     const finishMs = performance.now() - startedAt;
     setStatus("won");
     setElapsed(finishMs);
-    setScores((prev) => {
-      const next = [...prev, { ms: finishMs, ts: Date.now() }]
-        .sort((a, b) => a.ms - b.ms)
-        .slice(0, 10);
-      saveScores(next);
-      return next;
-    });
   }, [player, goal, status]);
+
+  const saveRun = useCallback(() => {
+    const trimmed = name.trim();
+    if (!trimmed || submitted) return;
+    localStorage.setItem(NAME_KEY, trimmed);
+    setSubmitted(true);
+    submitScore({
+      name: trimmed,
+      ms: elapsed,
+      rotation: runModesRef.current.rotation,
+      chaser: runModesRef.current.chaser,
+    })
+      .then(setScores)
+      .catch(() => setSubmitted(false));
+  }, [name, submitted, elapsed]);
 
   // Lose condition — only when chaser is active.
   useEffect(() => {
@@ -290,7 +289,29 @@ export function MazeGame({ command }: MazeGameProps) {
 
       {status === "won" && (
         <div className="maze-banner ok">
-          {t("maze.won", { time: formatTime(elapsed) })}
+          <span>{t("maze.won", { time: formatTime(elapsed) })}</span>
+          {submitted ? (
+            <span className="maze-saved">{t("maze.saved")}</span>
+          ) : (
+            <form
+              className="maze-save"
+              onSubmit={(e) => {
+                e.preventDefault();
+                saveRun();
+              }}
+            >
+              <input
+                type="text"
+                maxLength={20}
+                value={name}
+                placeholder={t("maze.namePlaceholder")}
+                onChange={(e) => setName(e.target.value)}
+              />
+              <button type="submit" disabled={!name.trim()}>
+                {t("maze.saveScore")}
+              </button>
+            </form>
+          )}
         </div>
       )}
       {status === "lost" && (
@@ -306,10 +327,12 @@ export function MazeGame({ command }: MazeGameProps) {
           <ol>
             {scores.slice(0, 5).map((s, i) => (
               <li key={`${s.ts}-${i}`}>
-                <span>{formatTime(s.ms)}</span>
-                <span className="maze-leaderboard-date">
-                  {new Date(s.ts).toLocaleDateString()}
+                <span className="maze-leaderboard-name">{s.name}</span>
+                <span className="maze-leaderboard-modes">
+                  {s.rotation && <span className="maze-mode-badge">{t("maze.rotation")}</span>}
+                  {s.chaser && <span className="maze-mode-badge">{t("maze.chaser")}</span>}
                 </span>
+                <span>{formatTime(s.ms)}</span>
               </li>
             ))}
           </ol>

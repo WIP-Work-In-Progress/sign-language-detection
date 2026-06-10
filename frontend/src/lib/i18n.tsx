@@ -78,6 +78,9 @@ const en: Dict = {
   "maze.lost": "The chaser caught you. Press Restart and try again.",
   "maze.bestTimes": "Best times",
   "maze.noScores": "No scores yet — finish a run.",
+  "maze.namePlaceholder": "Your name",
+  "maze.saveScore": "Save score",
+  "maze.saved": "Saved to leaderboard!",
   "settings.holdTime": "Hold time",
   "settings.holdTime.hint":
     "How long you need to hold a sign before it commits. Lower = faster but more accidental commits.",
@@ -156,6 +159,9 @@ const pl: Dict = {
     "Berek! Naciśnij Restart spróbuj jeszcze raz.",
   "maze.bestTimes": "Najlepsze wyniki",
   "maze.noScores": "Brak wyników — skończ pierwszą grę.",
+  "maze.namePlaceholder": "Twoje imię",
+  "maze.saveScore": "Zapisz wynik",
+  "maze.saved": "Zapisano w rankingu!",
   "settings.holdTime": "Czas przytrzymania",
   "settings.holdTime.hint":
     "Jak długo trzymać znak, żeby się zatwierdził. Mniej = szybciej, ale więcej przypadkowych zatwierdzeń.",

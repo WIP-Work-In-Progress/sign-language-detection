@@ -30,6 +30,32 @@ export async function getLabels(): Promise<Record<number, string>> {
   return res.json();
 }
 
+export interface ScoreEntry {
+  name: string;
+  ms: number;
+  rotation: boolean;
+  chaser: boolean;
+  ts: number;
+}
+
+export async function getLeaderboard(): Promise<ScoreEntry[]> {
+  const res = await fetch(`${API_BASE}/leaderboard`);
+  if (!res.ok) throw new Error(`Leaderboard fetch failed (${res.status})`);
+  return res.json();
+}
+
+export async function submitScore(
+  entry: Omit<ScoreEntry, "ts">,
+): Promise<ScoreEntry[]> {
+  const res = await fetch(`${API_BASE}/leaderboard`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(entry),
+  });
+  if (!res.ok) throw new Error(`Score submit failed (${res.status})`);
+  return res.json();
+}
+
 export async function predict(
   features: number[],
   signal?: AbortSignal,

@@ -821,6 +821,41 @@ code {
   background: var(--success-bg);
   border: 1px solid #bbf7d0;
   color: var(--success);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.maze-save {
+  display: flex;
+  gap: 6px;
+}
+
+.maze-save input {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.maze-save button {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  background: var(--success);
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.maze-save button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.maze-saved {
+  font-size: 12px;
 }
 
 .maze-banner.err {
@@ -871,6 +906,33 @@ code {
   font-variant-numeric: tabular-nums;
   font-size: 13px;
   color: var(--text);
+}
+
+.maze-leaderboard li {
+  gap: 8px;
+}
+
+.maze-leaderboard-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.maze-leaderboard-modes {
+  display: flex;
+  gap: 4px;
+}
+
+.maze-mode-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .maze-leaderboard-date {

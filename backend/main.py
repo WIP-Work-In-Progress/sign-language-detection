@@ -9,9 +9,11 @@ letter plus confidence.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import threading
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -28,9 +30,15 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 MODEL_PATH = PROJECT_ROOT / "model" / "asl_classifier-prod.tflite"
 LABELS_JSON = Path(__file__).resolve().parent / "labels.json"
+LEADERBOARD_PATH = Path(
+    os.environ.get("ASL_LEADERBOARD_PATH", str(Path(__file__).resolve().parent / "leaderboard.json"))
+)
 
 NUM_FEATURES = 42
 TOPK = 3
+LEADERBOARD_LIMIT = 50
+
+leaderboard_lock = threading.Lock()
 
 
 class PredictRequest(BaseModel):
@@ -46,6 +54,36 @@ class PredictResponse(BaseModel):
     label: str
     confidence: float
     topk: list[TopKEntry]
+
+
+class ScoreSubmit(BaseModel):
+    name: str = Field(..., min_length=1, max_length=20)
+    ms: float = Field(..., gt=0)
+    rotation: bool = False
+    chaser: bool = False
+
+
+class ScoreEntry(BaseModel):
+    name: str
+    ms: float
+    rotation: bool
+    chaser: bool
+    ts: float
+
+
+def load_leaderboard() -> list[dict]:
+    if not LEADERBOARD_PATH.exists():
+        return []
+    try:
+        data = json.loads(LEADERBOARD_PATH.read_text())
+        return data if isinstance(data, list) else []
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+def save_leaderboard(scores: list[dict]) -> None:
+    LEADERBOARD_PATH.parent.mkdir(parents=True, exist_ok=True)
+    LEADERBOARD_PATH.write_text(json.dumps(scores, indent=2))
 
 
 @asynccontextmanager
@@ -103,6 +141,30 @@ def health() -> dict:
 @app.get("/labels")
 def labels() -> dict[int, str]:
     return {i: label for i, label in enumerate(LABELS)}
+
+
+@app.get("/leaderboard", response_model=list[ScoreEntry])
+def get_leaderboard() -> list[dict]:
+    with leaderboard_lock:
+        return load_leaderboard()
+
+
+@app.post("/leaderboard", response_model=list[ScoreEntry])
+def submit_score(score: ScoreSubmit) -> list[dict]:
+    entry = {
+        "name": score.name.strip(),
+        "ms": score.ms,
+        "rotation": score.rotation,
+        "chaser": score.chaser,
+        "ts": time.time(),
+    }
+    with leaderboard_lock:
+        scores = load_leaderboard()
+        scores.append(entry)
+        scores.sort(key=lambda s: s["ms"])
+        scores = scores[:LEADERBOARD_LIMIT]
+        save_leaderboard(scores)
+        return scores
 
 
 @app.post("/predict", response_model=PredictResponse)

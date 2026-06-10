@@ -5,6 +5,7 @@ __pycache__/
 
 # Backend
 backend/labels.json
+backend/leaderboard.json
 
 # Frontend
 frontend/node_modules/
