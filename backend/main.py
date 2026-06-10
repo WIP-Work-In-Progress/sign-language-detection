@@ -9,9 +9,12 @@ letter plus confidence.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import threading
+import time
+from collections import OrderedDict
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -28,9 +31,21 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 MODEL_PATH = PROJECT_ROOT / "model" / "asl_classifier-prod.tflite"
 LABELS_JSON = Path(__file__).resolve().parent / "labels.json"
+LEADERBOARD_PATH = Path(
+    os.environ.get("ASL_LEADERBOARD_PATH", str(Path(__file__).resolve().parent / "leaderboard.json"))
+)
 
 NUM_FEATURES = 42
 TOPK = 3
+LEADERBOARD_LIMIT = 50
+# Hand landmark noise is sub-pixel at 480p; quantizing to 3 decimals groups
+# stable signs into the same cache key. Bounded LRU keeps memory predictable.
+CACHE_QUANT = 3
+CACHE_MAX = 512
+
+leaderboard_lock = threading.Lock()
+predict_cache: "OrderedDict[tuple, PredictResponse]" = OrderedDict()
+predict_cache_lock = threading.Lock()
 
 
 class PredictRequest(BaseModel):
@@ -46,6 +61,36 @@ class PredictResponse(BaseModel):
     label: str
     confidence: float
     topk: list[TopKEntry]
+
+
+class ScoreSubmit(BaseModel):
+    name: str = Field(..., min_length=1, max_length=20)
+    ms: float = Field(..., gt=0)
+    rotation: bool = False
+    chaser: bool = False
+
+
+class ScoreEntry(BaseModel):
+    name: str
+    ms: float
+    rotation: bool
+    chaser: bool
+    ts: float
+
+
+def load_leaderboard() -> list[dict]:
+    if not LEADERBOARD_PATH.exists():
+        return []
+    try:
+        data = json.loads(LEADERBOARD_PATH.read_text())
+        return data if isinstance(data, list) else []
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+def save_leaderboard(scores: list[dict]) -> None:
+    LEADERBOARD_PATH.parent.mkdir(parents=True, exist_ok=True)
+    LEADERBOARD_PATH.write_text(json.dumps(scores, indent=2))
 
 
 @asynccontextmanager
@@ -76,6 +121,13 @@ async def lifespan(app: FastAPI):
     app.state.output_index = int(output_details[0]["index"])
     app.state.model_lock = threading.Lock()
 
+    # Warmup: a couple of dummy invokes warm TFLite's internal caches so the
+    # first real request doesn't pay a 100-300ms one-time hit.
+    warm = np.zeros((1, NUM_FEATURES), dtype=np.float32)
+    for _ in range(2):
+        interpreter.set_tensor(input_details[0]["index"], warm)
+        interpreter.invoke()
+
     write_labels_json(LABELS_JSON)
     logger.info("Loaded %s, %d labels", MODEL_PATH.name, len(LABELS))
     yield
@@ -105,6 +157,30 @@ def labels() -> dict[int, str]:
     return {i: label for i, label in enumerate(LABELS)}
 
 
+@app.get("/leaderboard", response_model=list[ScoreEntry])
+def get_leaderboard() -> list[dict]:
+    with leaderboard_lock:
+        return load_leaderboard()
+
+
+@app.post("/leaderboard", response_model=list[ScoreEntry])
+def submit_score(score: ScoreSubmit) -> list[dict]:
+    entry = {
+        "name": score.name.strip(),
+        "ms": score.ms,
+        "rotation": score.rotation,
+        "chaser": score.chaser,
+        "ts": time.time(),
+    }
+    with leaderboard_lock:
+        scores = load_leaderboard()
+        scores.append(entry)
+        scores.sort(key=lambda s: s["ms"])
+        scores = scores[:LEADERBOARD_LIMIT]
+        save_leaderboard(scores)
+        return scores
+
+
 @app.post("/predict", response_model=PredictResponse)
 def predict(req: PredictRequest) -> PredictResponse:
     model = getattr(app.state, "model", None)
@@ -119,6 +195,16 @@ def predict(req: PredictRequest) -> PredictResponse:
     arr = np.asarray(req.features, dtype=np.float32)
     # NaN/Inf can sneak in if MediaPipe returns a degenerate frame; treat as Blank-ish input.
     arr = np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0)
+
+    # Quantize to fold sub-pixel landmark jitter into the same cache key.
+    # Stable signs then hit the cache instead of re-running TFLite.
+    cache_key = tuple(round(float(v), CACHE_QUANT) for v in arr.tolist())
+    with predict_cache_lock:
+        cached = predict_cache.get(cache_key)
+        if cached is not None:
+            predict_cache.move_to_end(cache_key)
+            return cached
+
     arr = arr.reshape(1, NUM_FEATURES)
 
     # TFLite interpreters are not thread-safe; serialize access.
@@ -131,8 +217,14 @@ def predict(req: PredictRequest) -> PredictResponse:
     order = np.argsort(probs)[::-1][:TOPK]
     topk = [TopKEntry(label=LABELS[int(i)], confidence=float(probs[int(i)])) for i in order]
 
-    return PredictResponse(
+    response = PredictResponse(
         label=LABELS[top_idx],
         confidence=float(probs[top_idx]),
         topk=topk,
     )
+    with predict_cache_lock:
+        predict_cache[cache_key] = response
+        predict_cache.move_to_end(cache_key)
+        while len(predict_cache) > CACHE_MAX:
+            predict_cache.popitem(last=False)
+    return response

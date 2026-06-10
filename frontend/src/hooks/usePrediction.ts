@@ -25,6 +25,7 @@ export function usePrediction({ minIntervalMs = 100 }: UsePredictionOpts = {}) {
 
   const inFlightRef = useRef(false);
   const lastFiredRef = useRef<number>(0);
+  const lastErrorAtRef = useRef<number>(0);
   const pendingRef = useRef<number[] | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -40,6 +41,10 @@ export function usePrediction({ minIntervalMs = 100 }: UsePredictionOpts = {}) {
       if ((e as Error).name === "AbortError") {
         setState((s) => ({ ...s, inFlight: false }));
       } else {
+        // Record the error timestamp; the next submit() retries immediately
+        // rather than waiting a full minIntervalMs window, so a single
+        // failed request doesn't blank the UI for 100ms.
+        lastErrorAtRef.current = performance.now();
         setState({
           response: null,
           error: e instanceof Error ? e.message : String(e),
@@ -62,7 +67,8 @@ export function usePrediction({ minIntervalMs = 100 }: UsePredictionOpts = {}) {
     (features: number[]) => {
       const now = performance.now();
       const elapsed = now - lastFiredRef.current;
-      if (inFlightRef.current || elapsed < minIntervalMs) {
+      const justErrored = now - lastErrorAtRef.current < 50;
+      if (inFlightRef.current || (elapsed < minIntervalMs && !justErrored)) {
         pendingRef.current = features;
         return;
       }
