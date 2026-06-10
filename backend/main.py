@@ -14,6 +14,7 @@ import logging
 import os
 import threading
 import time
+from collections import OrderedDict
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -37,8 +38,14 @@ LEADERBOARD_PATH = Path(
 NUM_FEATURES = 42
 TOPK = 3
 LEADERBOARD_LIMIT = 50
+# Hand landmark noise is sub-pixel at 480p; quantizing to 3 decimals groups
+# stable signs into the same cache key. Bounded LRU keeps memory predictable.
+CACHE_QUANT = 3
+CACHE_MAX = 512
 
 leaderboard_lock = threading.Lock()
+predict_cache: "OrderedDict[tuple, PredictResponse]" = OrderedDict()
+predict_cache_lock = threading.Lock()
 
 
 class PredictRequest(BaseModel):
@@ -114,6 +121,13 @@ async def lifespan(app: FastAPI):
     app.state.output_index = int(output_details[0]["index"])
     app.state.model_lock = threading.Lock()
 
+    # Warmup: a couple of dummy invokes warm TFLite's internal caches so the
+    # first real request doesn't pay a 100-300ms one-time hit.
+    warm = np.zeros((1, NUM_FEATURES), dtype=np.float32)
+    for _ in range(2):
+        interpreter.set_tensor(input_details[0]["index"], warm)
+        interpreter.invoke()
+
     write_labels_json(LABELS_JSON)
     logger.info("Loaded %s, %d labels", MODEL_PATH.name, len(LABELS))
     yield
@@ -181,6 +195,16 @@ def predict(req: PredictRequest) -> PredictResponse:
     arr = np.asarray(req.features, dtype=np.float32)
     # NaN/Inf can sneak in if MediaPipe returns a degenerate frame; treat as Blank-ish input.
     arr = np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0)
+
+    # Quantize to fold sub-pixel landmark jitter into the same cache key.
+    # Stable signs then hit the cache instead of re-running TFLite.
+    cache_key = tuple(round(float(v), CACHE_QUANT) for v in arr.tolist())
+    with predict_cache_lock:
+        cached = predict_cache.get(cache_key)
+        if cached is not None:
+            predict_cache.move_to_end(cache_key)
+            return cached
+
     arr = arr.reshape(1, NUM_FEATURES)
 
     # TFLite interpreters are not thread-safe; serialize access.
@@ -193,8 +217,14 @@ def predict(req: PredictRequest) -> PredictResponse:
     order = np.argsort(probs)[::-1][:TOPK]
     topk = [TopKEntry(label=LABELS[int(i)], confidence=float(probs[int(i)])) for i in order]
 
-    return PredictResponse(
+    response = PredictResponse(
         label=LABELS[top_idx],
         confidence=float(probs[top_idx]),
         topk=topk,
     )
+    with predict_cache_lock:
+        predict_cache[cache_key] = response
+        predict_cache.move_to_end(cache_key)
+        while len(predict_cache) > CACHE_MAX:
+            predict_cache.popitem(last=False)
+    return response
